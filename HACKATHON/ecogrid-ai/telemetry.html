@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Planetary Climate & Biosphere Telemetry Hub — Earth Forward</title>
+<style>
+  :root {
+    --bg: #020617;
+    --hud: rgba(10, 15, 30, 0.7);
+    --hud-border: rgba(148, 163, 184, 0.25);
+    --accent: #38bdf8;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --text-dim: rgba(226, 232, 240, 0.55);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+  }
+
+  canvas { display: block; position: fixed; inset: 0; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10;
+    pointer-events: none;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 320px 1fr 320px;
+    grid-template-rows: auto 1fr auto;
+    gap: 16px;
+  }
+
+  .hud-panel {
+    pointer-events: auto;
+    background: var(--hud);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--hud-border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .hud-panel h3 {
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .hud-panel .value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .value.good { color: var(--green); text-shadow: 0 0 12px rgba(34, 197, 94, 0.5); }
+  .value.warn { color: var(--amber); text-shadow: 0 0 12px rgba(245, 158, 11, 0.5); }
+  .value.danger { color: var(--red); text-shadow: 0 0 12px rgba(239, 68, 68, 0.5); }
+
+  .progress-track {
+    width: 100%; height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--accent));
+    box-shadow: 0 0 10px var(--green);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .progress-fill.warn {
+    background: linear-gradient(90deg, var(--amber), #fbbf24);
+    box-shadow: 0 0 10px var(--amber);
+  }
+
+  .progress-fill.danger {
+    background: linear-gradient(90deg, var(--red), #f87171);
+    box-shadow: 0 0 10px var(--red);
+  }
+
+  /* Top-left: Mission info */
+  .top-left { grid-column: 1; grid-row: 1; }
+
+  /* Top-right: Telemetry */
+  .top-right { grid-column: 3; grid-row: 1; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Bottom-left: Interventions */
+  .bottom-left { grid-column: 1; grid-row: 3; }
+
+  .intervention-btn {
+    width: 100%;
+    background: linear-gradient(145deg, rgba(15, 25, 40, 0.85), rgba(8, 16, 28, 0.9));
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .intervention-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: var(--green);
+    box-shadow: 0 8px 25px rgba(34, 197, 94, 0.25);
+  }
+
+  .intervention-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+  }
+
+  .intervention-btn .icon {
+    font-size: 1.4rem;
+    filter: drop-shadow(0 0 6px rgba(34,197,94,0.6));
+  }
+
+  .intervention-btn .cooldown-track {
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%; height: 3px;
+    background: rgba(255,255,255,0.05);
+  }
+
+  .intervention-btn .cooldown-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--accent));
+    box-shadow: 0 0 8px var(--green);
+    width: 0%;
+    transition: width 0.1s linear;
+  }
+
+  /* Bottom-right: Event log */
+  .bottom-right { grid-column: 3; grid-row: 3; max-height: 220px; overflow: hidden; display: flex; flex-direction: column; }
+
+  .event-log {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent) transparent;
+  }
+
+  .event-log::-webkit-scrollbar { width: 4px; }
+  .event-log::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
+  .log-entry {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    padding: 6px 10px;
+    border-left: 2px solid var(--accent);
+    background: rgba(34, 197, 94, 0.05);
+    border-radius: 0 6px 6px 0;
+    animation: slideIn 0.3s ease-out;
+    line-height: 1.4;
+  }
+
+  .log-entry.warn { border-left-color: var(--amber); background: rgba(245,158,11,0.04); }
+  .log-entry.danger { border-left-color: var(--red); background: rgba(239,68,68,0.05); }
+  .log-entry.success { border-left-color: var(--green); background: rgba(34,197,94,0.05); }
+
+  .log-time {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    display: block;
+    margin-bottom: 1px;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Center: Region detail panel */
+  .center-panel {
+    grid-column: 2;
+    grid-row: 2;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .region-card {
+    pointer-events: auto;
+    background: var(--hud);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--hud-border);
+    border-radius: 14px;
+    padding: 18px 22px;
+    max-width: 380px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+    display: none;
+  }
+
+  .region-card.visible { display: block; animation: fadeIn 0.3s ease-out; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .region-card h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+
+  .region-card p {
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .region-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .region-stat {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .region-stat .label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+  }
+
+  .region-stat .val {
+    font-size: 0.9rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .deploy-btn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--green);
+    color: var(--green);
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    transition: all 0.25s ease;
+  }
+
+  .deploy-btn:hover {
+    background: var(--green);
+    color: var(--bg);
+    box-shadow: 0 0 20px var(--green);
+  }
+
+  /* Loading */
+  #loading {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    transition: opacity 0.8s ease;
+  }
+
+  #loading.hidden { opacity: 0; pointer-events: none; }
+
+  .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid rgba(148, 163, 184, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #error {
+    position: fixed;
+    top: 20px; right: 20px;
+    z-index: 60;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 0.8rem;
+    max-width: 320px;
+    backdrop-filter: blur(12px);
+    display: none;
+  }
+
+  @media (max-width: 900px) {
+    #hud {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto 1fr auto;
+      padding: 12px;
+      gap: 10px;
+    }
+    .top-left, .top-right, .bottom-left, .bottom-right { grid-column: 1; }
+    .top-left { grid-row: 1; }
+    .top-right { grid-row: 2; }
+    .center-panel { grid-row: 3; }
+    .bottom-left { grid-row: 4; }
+    .bottom-right { display: none; }
+    .hud-panel { padding: 10px 12px; }
+    .hud-panel .value { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim);">
+    Initializing Planetary Telemetry Hub...
+  </div>
+</div>
+
+<div id="error"></div>
+
+<div id="hud">
+  <!-- Top Left: Mission Info -->
+  <div class="hud-panel top-left">
+    <h3>// Mission Status</h3>
+    <div class="value good" id="missionStatus">ONLINE</div>
+    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
+      Planetary Climate & Biosphere Telemetry Hub
+    </div>
+    <div style="font-size: 0.7rem; color: var(--text-dim);">
+      NextStep Hacks 2026 — Earth Forward Track
+    </div>
+  </div>
+
+  <!-- Top Right: Telemetry -->
+  <div class="hud-panel top-right">
+    <h3>// Live Telemetry</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim);">Eco Health</div>
+        <div class="value good" id="ecoHealth">87%</div>
+      </div>
+      <div>
+        <div style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim);">Carbon Offset</div>
+        <div class="value" id="carbonOffset">12.4t</div>
+      </div>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="ecoBar" style="width: 87%"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+      <div>
+        <div style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim);">Active Threats</div>
+        <div class="value warn" id="threatCount">3</div>
+      </div>
+      <div>
+        <div style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim);">Mitigations</div>
+        <div class="value good" id="mitigations">7</div>
+      </div>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill warn" id="threatBar" style="width: 35%"></div>
+    </div>
+  </div>
+
+  <!-- Center: Region Detail -->
+  <div class="center-panel">
+    <div class="region-card" id="regionCard">
+      <h2 id="regionName">Amazon Basin</h2>
+      <p id="regionDesc">Critical deforestation hotspot. Deploy reforestation drones to neutralize illegal logging activity.</p>
+      <div class="region-stats">
+        <div class="region-stat">
+          <div class="label">Health</div>
+          <div class="val" id="regionHealth">62%</div>
+        </div>
+        <div class="region-stat">
+          <div class="label">Threat</div>
+          <div class="val warn" id="regionThreat">HIGH</div>
+        </div>
+        <div class="region-stat">
+          <div class="label">Carbon</div>
+          <div class="val" id="regionCarbon">-4.2t</div>
+        </div>
+        <div class="region-stat">
+          <div class="label">Zone</div>
+          <div class="val" id="regionZone">Tropical</div>
+        </div>
+      </div>
+      <button class="deploy-btn" id="deployBtn">Deploy Reforestation Drones</button>
+    </div>
+  </div>
+
+  <!-- Bottom Left: Interventions -->
+  <div class="hud-panel bottom-left">
+    <h3>// Eco Interventions</h3>
+    <button class="intervention-btn" id="btn-drone" onclick="triggerIntervention('drone')">
+      <span class="icon">🛸</span>
+      <span>Drone Swarm</span>
+      <div class="cooldown-track"><div class="cooldown-fill" id="cd-drone"></div></div>
+    </button>
+    <button class="intervention-btn" id="btn-grid" onclick="triggerIntervention('grid')">
+      <span class="icon">⚡</span>
+      <span>Smart Grid</span>
+      <div class="cooldown-track"><div class="cooldown-fill" id="cd-grid"></div></div>
+    </button>
+    <button class="intervention-btn" id="btn-corridor" onclick="triggerIntervention('corridor')">
+      <span class="icon">🛡️</span>
+      <span>Corridor Lock</span>
+      <div class="cooldown-track"><div class="cooldown-fill" id="cd-corridor"></div></div>
+    </button>
+    <button class="intervention-btn" id="btn-cloud" onclick="triggerIntervention('cloud')">
+      <span class="icon">🌧️</span>
+      <span>Cloud-Seed</span>
+      <div class="cooldown-track"><div class="cooldown-fill" id="cd-cloud"></div></div>
+    </button>
+  </div>
+
+  <!-- Bottom Right: Event Log -->
+  <div class="hud-panel bottom-right">
+    <h3>// Telemetry Feed</h3>
+    <div class="event-log" id="eventLog"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+// ============================================
+// PLANETARY CLIMATE & BIOSPHERE TELEMETRY HUB
+// ============================================
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ---------- Configuration ----------
+const CONFIG = {
+  assetBase: './',
+  sunScale: 6,
+  earthScale: 3,
+  moonScale: 0.8,
+  earthOrbitRadius: 35,
+  moonOrbitRadius: 6,
+  earthRotationSpeed: 0.15,
+  earthOrbitSpeed: 0.03,
+  moonOrbitSpeed: 0.12,
+  atmosphereScale: 1.08,
+};
+
+// ---------- State ----------
+const state = {
+  time: 0,
+  speed: 1,
+  loaded: false,
+  earth: null,
+  sun: null,
+  moon: null,
+  earthGroup: null,
+  moonGroup: null,
+  atmosphere: null,
+  hotspots: [],
+  selectedRegion: null,
+  cooldowns: { drone: 0, grid: 0, corridor: 0, cloud: 0 },
+  mitigations: 0,
+  carbonOffset: 12.4,
+};
+
+// ---------- Scene Setup ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#020617');
+scene.fog = new THREE.FogExp2('#020617', 0.0006);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(15, 8, 20);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.body.appendChild(renderer.domElement);
+
+// ---------- Lighting ----------
+const ambient = new THREE.AmbientLight(0x1e293b, 0.5);
+scene.add(ambient);
+
+const starlight = new THREE.AmbientLight(0xffffff, 0.12);
+scene.add(starlight);
+
+// Sun directional light (simulating sun.glb as light source)
+const sunLight = new THREE.DirectionalLight(0xfff7ed, 4);
+sunLight.position.set(80, 30, 50);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 300;
+sunLight.shadow.camera.left = -60;
+sunLight.shadow.camera.right = 60;
+sunLight.shadow.camera.top = 60;
+sunLight.shadow.camera.bottom = -60;
+sunLight.shadow.bias = -0.0004;
+scene.add(sunLight);
+
+const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.7);
+rimLight.position.set(-30, 15, -30);
+scene.add(rimLight);
+
+// ---------- Stars ----------
+function createStars() {
+  const count = 3000;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = 250 + Math.random() * 350;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3 + 2] = r * Math.cos(phi);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 1, transparent: true, opacity: 0.7, sizeAttenuation: true });
+  scene.add(new THREE.Points(geo, mat));
+}
+createStars();
+
+// ---------- Atmosphere Shader ----------
+function createAtmosphere(radius) {
+  const geo = new THREE.SphereGeometry(radius, 64, 64);
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vec3 viewDir = normalize(-vPosition);
+        float fresnel = pow(1.0 - dot(viewDir, vNormal), 3.5);
+        vec3 color = mix(vec3(0.2, 0.6, 1.0), vec3(0.1, 0.8, 1.0), fresnel);
+        gl_FragColor = vec4(color, fresnel * 0.45);
+      }
+    `,
+    transparent: true,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
+// ---------- Hotspot System ----------
+const HOTSPOTS = [
+  { name: 'Amazon Basin', lat: -3, lon: -60, health: 62, threat: 'HIGH', carbon: -4.2, zone: 'Tropical', desc: 'Critical deforestation hotspot. Deploy reforestation drones to neutralize illegal logging activity.' },
+  { name: 'Sahara Edge', lat: 20, lon: 10, health: 45, threat: 'CRITICAL', carbon: -8.7, zone: 'Arid', desc: 'Severe drought stress and soil depletion. Activate smart-grid load balancing to reduce carbon emissions.' },
+  { name: 'Great Barrier', lat: -18, lon: 147, health: 71, threat: 'ELEVATED', carbon: -2.1, zone: 'Marine', desc: 'Coral bleaching and marine ecosystem stress. Deploy cloud-seeding to cool water temperatures.' },
+  { name: 'Siberian Taiga', lat: 62, lon: 100, health: 88, threat: 'LOW', carbon: 1.5, zone: 'Boreal', desc: 'Stable forest health. Carbon sequestration nominal. Maintain monitoring.' },
+  { name: 'Congo Basin', lat: -2, lon: 23, health: 55, threat: 'HIGH', carbon: -5.3, zone: 'Tropical', desc: 'Poaching activity detected. Engage wildlife corridor quarantine to protect migration paths.' },
+];
+
+function latLonToVector3(lat, lon, radius) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lon + 180) * (Math.PI / 180);
+  return new THREE.Vector3(
+    -radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+function createHotspotMarker(data, index) {
+  const group = new THREE.Group();
+  group.userData = { ...data, index };
+
+  // Outer ring
+  const ringGeo = new THREE.RingGeometry(0.25, 0.35, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.lookAt(new THREE.Vector3(0, 0, 0));
+  group.add(ring);
+
+  // Inner dot
+  const dotGeo = new THREE.CircleGeometry(0.12, 16);
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+  const dot = new THREE.Mesh(dotGeo, dotMat);
+  dot.lookAt(new THREE.Vector3(0, 0, 0));
+  group.add(dot);
+
+  // Pulse ring
+  const pulseGeo = new THREE.RingGeometry(0.4, 0.45, 32);
+  const pulseMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+  const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+  pulse.lookAt(new THREE.Vector3(0, 0, 0));
+  pulse.userData.isPulse = true;
+  group.add(pulse);
+
+  return group;
+}
+
+// ---------- Scene Objects ----------
+const earthGroup = new THREE.Group();
+scene.add(earthGroup);
+state.earthGroup = earthGroup;
+
+const moonGroup = new THREE.Group();
+scene.add(moonGroup);
+state.moonGroup = moonGroup;
+
+// Earth
+state.earth = new THREE.Group();
+const earthGeo = new THREE.SphereGeometry(CONFIG.earthScale, 64, 64);
+const earthMat = new THREE.MeshStandardMaterial({
+  color: 0x22c55e,
+  roughness: 0.8,
+  metalness: 0.1,
+});
+const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+earthMesh.castShadow = true;
+earthMesh.receiveShadow = true;
+state.earth.add(earthMesh);
+state.earth.userData = { isFallback: true, mesh: earthMesh };
+earthGroup.add(state.earth);
+
+// Atmosphere
+const atmosphere = createAtmosphere(CONFIG.earthScale * CONFIG.atmosphereScale);
+state.earth.add(atmosphere);
+state.atmosphere = atmosphere;
+
+// Hotspots
+HOTSPOTS.forEach((data, i) => {
+  const marker = createHotspotMarker(data, i);
+  const pos = latLonToVector3(data.lat, data.lon, CONFIG.earthScale * 1.02);
+  marker.position.copy(pos);
+  state.earth.add(marker);
+  state.hotspots.push(marker);
+});
+
+// Moon (Geospatial Monitoring Satellite)
+state.moon = new THREE.Group();
+const moonGeo = new THREE.SphereGeometry(CONFIG.moonScale, 32, 32);
+const moonMat = new THREE.MeshStandardMaterial({
+  color: 0x9ca3af,
+  roughness: 0.9,
+  metalness: 0.2,
+  emissive: 0x38bdf8,
+  emissiveIntensity: 0.3,
+});
+const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+moonMesh.castShadow = true;
+moonMesh.receiveShadow = true;
+state.moon.add(moonMesh);
+state.moon.userData = { isFallback: true, mesh: moonMesh };
+moonGroup.add(state.moon);
+
+moonGroup.position.x = CONFIG.earthOrbitRadius;
+
+// Sun (off-screen directional source)
+state.sun = new THREE.Group();
+const sunGeo = new THREE.SphereGeometry(CONFIG.sunScale, 32, 32);
+const sunMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+state.sun.add(sunMesh);
+state.sun.userData = { isFallback: true, mesh: sunMesh };
+state.sun.position.set(80, 30, 50);
+scene.add(state.sun);
+
+// Sun glow
+const glowGeo = new THREE.SphereGeometry(CONFIG.sunScale * 1.3, 32, 32);
+const glowMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.08, side: THREE.BackSide });
+state.sun.add(new THREE.Mesh(glowGeo, glowMat));
+
+// ---------- Asset Loading ----------
+const loader = new GLTFLoader();
+
+async function loadModel(path) {
+  try {
+    const gltf = await loader.loadAsync(path);
+    const model = gltf.scene;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    return { model, fallback: false };
+  } catch (err) {
+    console.warn(`[TelemetryHub] Failed to load ${path}:`, err.message);
+    return { model: null, fallback: true };
+  }
+}
+
+async function initAssets() {
+  const [sunResult, earthResult, moonResult] = await Promise.all([
+    loadModel(`${CONFIG.assetBase}sun.glb`),
+    loadModel(`${CONFIG.assetBase}earth.glb`),
+    loadModel(`${CONFIG.assetBase}moon.glb`),
+  ]);
+
+  // Sun
+  if (!sunResult.fallback && sunResult.model) {
+    const old = state.sun.userData.mesh;
+    if (old && old.parent) state.sun.remove(old);
+    sunResult.model.scale.setScalar(CONFIG.sunScale);
+    state.sun.add(sunResult.model);
+    state.sun.userData.mesh = sunResult.model;
+    state.sun.userData.isFallback = false;
+  }
+
+  // Earth
+  if (!earthResult.fallback && earthResult.model) {
+    const old = state.earth.userData.mesh;
+    if (old && old.parent) state.earth.remove(old);
+    earthResult.model.scale.setScalar(CONFIG.earthScale);
+    state.earth.add(earthResult.model);
+    state.earth.userData.mesh = earthResult.model;
+    state.earth.userData.isFallback = false;
+  }
+
+  // Moon
+  if (!moonResult.fallback && moonResult.model) {
+    const old = state.moon.userData.mesh;
+    if (old && old.parent) state.moon.remove(old);
+    moonResult.model.scale.setScalar(CONFIG.moonScale);
+    state.moon.add(moonResult.model);
+    state.moon.userData.mesh = moonResult.model;
+    state.moon.userData.isFallback = false;
+  }
+
+  const anyFallback = sunResult.fallback || earthResult.fallback || moonResult.fallback;
+  if (anyFallback) {
+    const missing = [];
+    if (sunResult.fallback) missing.push('Sun');
+    if (earthResult.fallback) missing.push('Earth');
+    if (moonResult.fallback) missing.push('Moon');
+    showError(`Using fallback geometries for: ${missing.join(', ')}. Ensure GLB files are in project root.`);
+  }
+
+  state.loaded = true;
+  document.getElementById('loading').classList.add('hidden');
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 8000);
+}
+
+// ---------- Controls ----------
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 8;
+controls.maxDistance = 80;
+controls.target.set(CONFIG.earthOrbitRadius, 0, 0);
+controls.update();
+
+// ---------- Raycasting ----------
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function onMouseClick(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(state.hotspots, true);
+
+  if (intersects.length > 0) {
+    let obj = intersects[0].object;
+    while (obj.parent && !obj.userData.name) obj = obj.parent;
+    if (obj.userData && obj.userData.name) {
+      selectRegion(obj.userData);
+    }
+  }
+}
+
+window.addEventListener('click', onMouseClick);
+
+function selectRegion(data) {
+  state.selectedRegion = data;
+  const card = document.getElementById('regionCard');
+  document.getElementById('regionName').textContent = data.name;
+  document.getElementById('regionDesc').textContent = data.desc;
+  document.getElementById('regionHealth').textContent = data.health + '%';
+  document.getElementById('regionThreat').textContent = data.threat;
+  document.getElementById('regionCarbon').textContent = data.carbon + 't';
+  document.getElementById('regionZone').textContent = data.zone;
+
+  const healthEl = document.getElementById('regionHealth');
+  healthEl.className = 'val ' + (data.health > 70 ? 'good' : data.health > 50 ? 'warn' : 'danger');
+
+  const threatEl = document.getElementById('regionThreat');
+  threatEl.className = 'val ' + (data.threat === 'LOW' ? 'good' : data.threat === 'ELEVATED' ? 'warn' : 'danger');
+
+  card.classList.add('visible');
+
+  // Zoom camera to region
+  const pos = latLonToVector3(data.lat, data.lon, CONFIG.earthScale * 3);
+  const targetPos = new THREE.Vector3().copy(pos).add(earthGroup.position);
+  animateCamera(targetPos, earthGroup.position.clone().add(pos.normalize().multiplyScalar(CONFIG.earthScale * 2)));
+}
+
+function animateCamera(targetPos, lookTarget) {
+  const start = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const duration = 1200;
+  const startTime = performance.now();
+
+  function step(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    camera.position.lerpVectors(start, targetPos, ease);
+    controls.target.lerpVectors(startTarget, lookTarget, ease);
+    controls.update();
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ---------- Interventions ----------
+window.triggerIntervention = function(type) {
+  if (state.cooldowns[type] > 0) return;
+  state.cooldowns[type] = 8;
+  state.mitigations++;
+
+  const messages = {
+    drone: 'Drone swarm deployed to selected region. Deforestation neutralized.',
+    grid: 'Smart-grid load balancing activated. Carbon emissions reduced.',
+    corridor: 'Wildlife corridor quarantine established. Migration paths secured.',
+    cloud: 'Cloud-seeding protocol initiated. Thermal dampening wave deployed.',
+  };
+
+  addLog(messages[type], 'success');
+
+  if (state.selectedRegion) {
+    state.selectedRegion.health = Math.min(100, state.selectedRegion.health + 15);
+    state.selectedRegion.carbon = (parseFloat(state.selectedRegion.carbon) + 2.5).toFixed(1);
+    if (state.selectedRegion.health > 70) state.selectedRegion.threat = 'LOW';
+    else if (state.selectedRegion.health > 50) state.selectedRegion.threat = 'ELEVATED';
+    selectRegion(state.selectedRegion);
+  }
+
+  document.getElementById('btn-' + type).disabled = true;
+};
+
+// ---------- UI ----------
+function addLog(msg, type = '') {
+  const log = document.getElementById('eventLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + type;
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-US', { hour12: false });
+  entry.innerHTML = `<span class="log-time">[${time}]</span> ${msg}`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+  if (log.children.length > 30) log.removeChild(log.firstChild);
+}
+
+// Cooldown UI
+function updateCooldowns(dt) {
+  for (const key of Object.keys(state.cooldowns)) {
+    if (state.cooldowns[key] > 0) {
+      state.cooldowns[key] = Math.max(0, state.cooldowns[key] - dt);
+      const btn = document.getElementById('btn-' + key);
+      const cd = document.getElementById('cd-' + key);
+      if (btn && cd) {
+        btn.disabled = true;
+        cd.style.width = ((1 - state.cooldowns[key] / 8) * 100) + '%';
+      }
+    } else {
+      const btn = document.getElementById('btn-' + key);
+      if (btn) btn.disabled = false;
+    }
+  }
+}
+
+// HUD updates
+function updateHUD() {
+  document.getElementById('ecoHealth').textContent = Math.round(state.carbonOffset * 2.5) + '%';
+  document.getElementById('carbonOffset').textContent = state.carbonOffset.toFixed(1) + 't';
+  document.getElementById('mitigations').textContent = state.mitigations;
+
+  const threats = HOTSPOTS.filter(h => h.threat === 'HIGH' || h.threat === 'CRITICAL').length;
+  document.getElementById('threatCount').textContent = threats;
+
+  const ecoBar = document.getElementById('ecoBar');
+  const ecoPct = Math.min(100, Math.max(0, state.carbonOffset * 2.5));
+  ecoBar.style.width = ecoPct + '%';
+  ecoBar.className = 'progress-fill' + (ecoPct < 50 ? ' danger' : ecoPct < 75 ? ' warn' : '');
+
+  const threatBar = document.getElementById('threatBar');
+  threatBar.style.width = (threats / HOTSPOTS.length * 100) + '%';
+  threatBar.className = 'progress-fill' + (threats > 2 ? ' danger' : threats > 1 ? ' warn' : '');
+}
+
+// ---------- Animation Loop ----------
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.1);
+  state.time += dt * state.speed;
+
+  if (state.loaded) {
+    // Earth rotation
+    state.earth.rotation.y += dt * CONFIG.earthRotationSpeed * state.speed;
+
+    // Earth orbit
+    earthGroup.rotation.y += dt * CONFIG.earthOrbitSpeed * state.speed;
+
+    // Moon orbit
+    moonGroup.rotation.y += dt * CONFIG.moonOrbitSpeed * state.speed;
+
+    // Hotspot pulse animation
+    state.hotspots.forEach((hs) => {
+      hs.children.forEach((child) => {
+        if (child.userData && child.userData.isPulse) {
+          const s = 1 + Math.sin(state.time * 3) * 0.3;
+          child.scale.setScalar(s);
+          child.material.opacity = 0.4 * (1 - (s - 1) / 0.3);
+        }
+      });
+    });
+
+    // Sun glow
+    if (state.sun && state.sun.userData.mesh) {
+      const s = 1 + Math.sin(state.time * 0.5) * 0.05;
+      state.sun.userData.mesh.scale.setScalar(CONFIG.sunScale * s);
+    }
+  }
+
+  updateCooldowns(dt);
+  updateHUD();
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ---------- Resize ----------
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---------- Boot ----------
+initAssets()
+  .then(() => animate())
+  .catch((err) => {
+    console.error('[TelemetryHub] Boot failed:', err);
+    showError(`Initialization error: ${err.message}`);
+    state.loaded = true;
+    document.getElementById('loading').classList.add('hidden');
+    animate();
+  });
+</script>
+</body>
+</html>

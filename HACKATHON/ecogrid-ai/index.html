@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EcoGrid AI — Planetary Climate & Biosphere Telemetry Hub</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #020617;
+    --glass: rgba(10, 15, 30, 0.7);
+    --glass-border: rgba(148, 163, 184, 0.25);
+    --accent: #38bdf8;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --text-dim: rgba(226, 232, 240, 0.55);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+  }
+
+  /* ---------- Layout ---------- */
+  #app {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 320px 1fr 300px;
+    grid-template-rows: auto 1fr auto;
+    gap: 16px;
+    padding: 18px;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  #globe-container {
+    grid-column: 2;
+    grid-row: 2;
+    position: relative;
+    pointer-events: auto;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  #globe-container canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+    pointer-events: auto;
+  }
+
+  /* ---------- Top Left: Mission ---------- */
+  .top-left { grid-column: 1; grid-row: 1; padding: 14px 16px; }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .brand-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--green) 0%, transparent 70%);
+    box-shadow: 0 0 18px var(--green);
+    animation: pulse-glow 2.5s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 12px var(--green); transform: scale(1); }
+    50% { box-shadow: 0 0 28px var(--green), 0 0 48px var(--accent); transform: scale(1.06); }
+  }
+
+  .brand h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, var(--green), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .brand span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: block;
+    margin-top: 2px;
+  }
+
+  .mission-status {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  .mission-status .value {
+    color: var(--green);
+    font-weight: 700;
+  }
+
+  /* ---------- Top Center: Phase ---------- */
+  .top-center { grid-column: 2; grid-row: 1; display: flex; justify-content: center; }
+
+  .phase-badge {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .phase-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .phase-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .phase-dots { display: flex; gap: 8px; }
+
+  .phase-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: all 0.4s ease;
+  }
+
+  .phase-dot.active {
+    background: var(--amber);
+    box-shadow: 0 0 14px var(--amber);
+    border-color: var(--amber);
+    transform: scale(1.25);
+  }
+
+  .phase-dot.critical {
+    background: var(--red);
+    box-shadow: 0 0 18px var(--red);
+    border-color: var(--red);
+    animation: blink 0.6s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; box-shadow: 0 0 18px var(--red); }
+    50% { opacity: 0.35; box-shadow: 0 0 6px var(--red); }
+  }
+
+  /* ---------- Top Right: Telemetry ---------- */
+  .top-right { grid-column: 3; grid-row: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+  .telemetry-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(34,197,94,0.15);
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .metric { flex: 1; text-align: center; }
+
+  .metric-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--green);
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+    transition: all 0.3s ease;
+  }
+
+  .metric-value.danger { color: var(--red); text-shadow: 0 0 12px rgba(239, 68, 68, 0.6); animation: dangerPulse 0.8s ease-in-out infinite; }
+  .metric-value.warn { color: var(--amber); text-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+
+  @keyframes dangerPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .metric-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .progress-track {
+    width: 100%; height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--accent));
+    box-shadow: 0 0 8px var(--green);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .progress-fill.warn { background: linear-gradient(90deg, var(--amber), #fbbf24); box-shadow: 0 0 8px var(--amber); }
+  .progress-fill.danger { background: linear-gradient(90deg, var(--red), #f87171); box-shadow: 0 0 8px var(--red); }
+
+  /* ---------- Bottom: Command Deck ---------- */
+  .command-deck {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: 14px;
+    pointer-events: auto;
+    align-items: center;
+  }
+
+  .intervention-btn {
+    background: linear-gradient(145deg, rgba(15, 25, 40, 0.85), rgba(8, 16, 28, 0.9));
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 130px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .intervention-btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    border-color: var(--green);
+    box-shadow: 0 10px 30px rgba(34, 197, 94, 0.3);
+  }
+
+  .intervention-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+  }
+
+  .intervention-btn .icon {
+    font-size: 1.5rem;
+    filter: drop-shadow(0 0 6px rgba(34,197,94,0.6));
+  }
+
+  .intervention-btn .btn-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .intervention-btn .cooldown-track {
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%; height: 3px;
+    background: rgba(255,255,255,0.05);
+  }
+
+  .intervention-btn .cooldown-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--accent));
+    box-shadow: 0 0 8px var(--green);
+    width: 0%;
+    transition: width 0.1s linear;
+  }
+
+  /* ---------- Right: Event Log ---------- */
+  .right-panel { grid-column: 3; grid-row: 2; display: flex; flex-direction: column; gap: 10px; }
+
+  .event-log {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent) transparent;
+  }
+
+  .event-log::-webkit-scrollbar { width: 4px; }
+  .event-log::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
+  .log-entry {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    padding: 6px 10px;
+    border-left: 2px solid var(--accent);
+    background: rgba(34, 197, 94, 0.05);
+    border-radius: 0 6px 6px 0;
+    animation: slideIn 0.3s ease-out;
+    line-height: 1.4;
+  }
+
+  .log-entry.warn { border-left-color: var(--amber); background: rgba(245,158,11,0.04); }
+  .log-entry.danger { border-left-color: var(--red); background: rgba(239,68,68,0.05); }
+  .log-entry.success { border-left-color: var(--green); background: rgba(34,197,94,0.05); }
+
+  .log-time {
+    font-size: 0.55rem;
+    color: var(--text-dim);
+    display: block;
+    margin-bottom: 1px;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ---------- Loading ---------- */
+  #loading {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    transition: opacity 0.8s ease;
+  }
+
+  #loading.hidden { opacity: 0; pointer-events: none; }
+
+  .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid rgba(148, 163, 184, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #error {
+    position: fixed;
+    top: 20px; right: 20px;
+    z-index: 60;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 0.8rem;
+    max-width: 320px;
+    backdrop-filter: blur(12px);
+    display: none;
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 1100px) {
+    #app {
+      grid-template-columns: 260px 1fr 260px;
+      gap: 10px;
+      padding: 12px;
+    }
+  }
+
+  @media (max-width: 900px) {
+    #app {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto 1fr auto;
+      padding: 10px;
+      gap: 10px;
+    }
+    .top-left { grid-column: 1; grid-row: 1; }
+    .top-center { grid-column: 1; grid-row: 2; }
+    .top-right { grid-column: 1; grid-row: 3; }
+    #globe-container { grid-column: 1; grid-row: 4; min-height: 300px; }
+    .command-deck { grid-column: 1; grid-row: 5; }
+    .right-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim);">
+    Initializing Planetary Telemetry Hub...
+  </div>
+</div>
+
+<div id="error"></div>
+
+<div id="app">
+  <!-- Top Left: Mission -->
+  <div class="glass top-left">
+    <div class="brand">
+      <div class="brand-icon"></div>
+      <div>
+        <h1>ECOGrid AI</h1>
+        <span>Earth Forward — Sector 7G</span>
+      </div>
+    </div>
+    <div class="mission-status">
+      Status: <span class="value">ONLINE</span><br>
+      Planetary Climate & Biosphere Telemetry Hub<br>
+      NextStep Hacks 2026
+    </div>
+  </div>
+
+  <!-- Top Center: Phase -->
+  <div class="glass top-center">
+    <div class="phase-badge">
+      <div>
+        <div class="phase-label">Current Phase</div>
+        <div class="phase-name" id="phaseName">STANDBY</div>
+      </div>
+      <div class="phase-dots">
+        <div class="phase-dot" id="dot1"></div>
+        <div class="phase-dot" id="dot2"></div>
+        <div class="phase-dot" id="dot3"></div>
+        <div class="phase-dot" id="dot4"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Right: Telemetry -->
+  <div class="glass top-right">
+    <div class="telemetry-header">// LIVE TELEMETRY</div>
+    <div class="metric-row">
+      <div class="metric">
+        <div class="metric-value" id="ecoHealth">87%</div>
+        <div class="metric-label">Eco Health</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="ecoBar" style="width: 87%"></div>
+        </div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="carbonOffset">12.4t</div>
+        <div class="metric-label">Carbon Offset</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="carbonBar" style="width: 25%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="metric-row" style="margin-top: 6px;">
+      <div class="metric">
+        <div class="metric-value" id="threatCount">3</div>
+        <div class="metric-label">Threats</div>
+        <div class="progress-track">
+          <div class="progress-fill warn" id="threatBar" style="width: 35%"></div>
+        </div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="mitigations">7</div>
+        <div class="metric-label">Mitigations</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center: Globe -->
+  <div id="globe-container">
+    <canvas id="globe"></canvas>
+  </div>
+
+  <!-- Right: Event Log -->
+  <div class="glass right-panel">
+    <div class="telemetry-header">// TELEMETRY FEED</div>
+    <div class="event-log" id="eventLog"></div>
+  </div>
+
+  <!-- Bottom: Command Deck -->
+  <div class="glass command-deck">
+    <button class="intervention-btn" id="btn-drone" onclick="triggerIntervention('drone')">
+      <span class="icon">🛸</span>
+      <span class="btn-label">Drone Swarm</span>
+      <div class="cooldown-track"><div class="cooldown-fill" id="cd-drone"></div></div>
+    </button>
+    <button class="intervention-btn" id="btn-grid" onclick="triggerIntervention('grid')">
+      <span class="icon">⚡</span>
+      <span class="btn-label">Smart Grid</span>
+      <div class="cooldown-track"><div class="cooldown-fill" id="cd-grid"></div></div>
+    </button>
+    <button class="intervention-btn" id="btn-corridor" onclick="triggerIntervention('corridor')">
+      <span class="icon">🛡️</span>
+      <span class="btn-label">Corridor Lock</span>
+      <div class="cooldown-track"><div class="cooldown-fill" id="cd-corridor"></div></div>
+    </button>
+    <button class="intervention-btn" id="btn-cloud" onclick="triggerIntervention('cloud')">
+      <span class="icon">🌧️</span>
+      <span class="btn-label">Cloud-Seed</span>
+      <div class="cooldown-track"><div class="cooldown-fill" id="cd-cloud"></div></div>
+    </button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+// ============================================
+// ECOGrid AI — Planetary Climate & Biosphere Telemetry Hub
+// ============================================
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// ---------- Configuration ----------
+const CONFIG = {
+  assetBase: './',
+  sunScale: 5,
+  earthScale: 2.5,
+  moonScale: 0.7,
+  earthOrbitRadius: 30,
+  moonOrbitRadius: 5,
+  earthRotationSpeed: 0.12,
+  earthOrbitSpeed: 0,
+  moonOrbitSpeed: 0.1,
+  atmosphereScale: 1.06,
+  sunDistance: 120,
+};
+
+// ---------- State ----------
+const state = {
+  time: 0,
+  speed: 1,
+  loaded: false,
+  earth: null,
+  sun: null,
+  moon: null,
+  earthGroup: null,
+  moonGroup: null,
+  atmosphere: null,
+  hotspots: [],
+  selectedRegion: null,
+  cooldowns: { drone: 0, grid: 0, corridor: 0, cloud: 0 },
+  mitigations: 7,
+  carbonOffset: 12.4,
+  ecoHealth: 87,
+  threatCount: 3,
+  particles: [],
+  flashOpacity: 0,
+};
+
+// ---------- Scene Setup ----------
+const container = document.getElementById('globe-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#020617');
+scene.fog = new THREE.FogExp2('#020617', 0.0006);
+
+const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 2000);
+camera.position.set(8, 4, 12);
+
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('globe'), antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+// ---------- Lighting ----------
+const ambient = new THREE.AmbientLight(0x1e293b, 0.5);
+scene.add(ambient);
+
+const starlight = new THREE.AmbientLight(0xffffff, 0.12);
+scene.add(starlight);
+
+const sunLight = new THREE.DirectionalLight(0xfff7ed, 4);
+sunLight.position.set(CONFIG.sunDistance, 20, CONFIG.sunDistance * 0.8);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 300;
+sunLight.shadow.camera.left = -50;
+sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50;
+sunLight.shadow.camera.bottom = -50;
+sunLight.shadow.bias = -0.0004;
+scene.add(sunLight);
+
+const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.7);
+rimLight.position.set(-25, 12, -25);
+scene.add(rimLight);
+
+// ---------- Stars ----------
+function createStars() {
+  const count = 2500;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = 200 + Math.random() * 300;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3 + 2] = r * Math.cos(phi);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 1, transparent: true, opacity: 0.7, sizeAttenuation: true });
+  scene.add(new THREE.Points(geo, mat));
+}
+createStars();
+
+// ---------- Atmosphere ----------
+function createAtmosphere(radius) {
+  const geo = new THREE.SphereGeometry(radius, 64, 64);
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vec3 viewDir = normalize(-vPosition);
+        float fresnel = pow(1.0 - dot(viewDir, vNormal), 3.5);
+        vec3 color = mix(vec3(0.2, 0.6, 1.0), vec3(0.1, 0.8, 1.0), fresnel);
+        gl_FragColor = vec4(color, fresnel * 0.4);
+      }
+    `,
+    transparent: true,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
+// ---------- Hotspots ----------
+const HOTSPOTS = [
+  { name: 'Amazon Basin', lat: -3, lon: -60, health: 62, threat: 'HIGH', carbon: -4.2, zone: 'Tropical', desc: 'Critical deforestation hotspot. Deploy reforestation drones to neutralize illegal logging.' },
+  { name: 'Sahara Edge', lat: 20, lon: 10, health: 45, threat: 'CRITICAL', carbon: -8.7, zone: 'Arid', desc: 'Severe drought stress. Activate smart-grid load balancing to reduce emissions.' },
+  { name: 'Great Barrier', lat: -18, lon: 147, health: 71, threat: 'ELEVATED', carbon: -2.1, zone: 'Marine', desc: 'Coral bleaching stress. Deploy cloud-seeding to cool waters.' },
+  { name: 'Siberian Taiga', lat: 62, lon: 100, health: 88, threat: 'LOW', carbon: 1.5, zone: 'Boreal', desc: 'Stable forest health. Carbon sequestration nominal.' },
+  { name: 'Congo Basin', lat: -2, lon: 23, health: 55, threat: 'HIGH', carbon: -5.3, zone: 'Tropical', desc: 'Poaching activity detected. Engage wildlife corridor quarantine.' },
+];
+
+function latLonToVector3(lat, lon, radius) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lon + 180) * (Math.PI / 180);
+  return new THREE.Vector3(
+    -radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+function createHotspotMarker(data) {
+  const group = new THREE.Group();
+  group.userData = data;
+
+  const ringGeo = new THREE.RingGeometry(0.2, 0.28, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.lookAt(new THREE.Vector3(0, 0, 0));
+  group.add(ring);
+
+  const dotGeo = new THREE.CircleGeometry(0.1, 16);
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+  const dot = new THREE.Mesh(dotGeo, dotMat);
+  dot.lookAt(new THREE.Vector3(0, 0, 0));
+  group.add(dot);
+
+  const pulseGeo = new THREE.RingGeometry(0.35, 0.4, 32);
+  const pulseMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+  const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+  pulse.lookAt(new THREE.Vector3(0, 0, 0));
+  pulse.userData.isPulse = true;
+  group.add(pulse);
+
+  return group;
+}
+
+// ---------- Scene Objects ----------
+const earthGroup = new THREE.Group();
+scene.add(earthGroup);
+
+const moonGroup = new THREE.Group();
+scene.add(moonGroup);
+
+// Earth
+state.earth = new THREE.Group();
+const earthGeo = new THREE.SphereGeometry(CONFIG.earthScale, 64, 64);
+const earthMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.8, metalness: 0.1 });
+const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+earthMesh.castShadow = true;
+earthMesh.receiveShadow = true;
+state.earth.add(earthMesh);
+state.earth.userData = { isFallback: true, mesh: earthMesh };
+earthGroup.add(state.earth);
+
+const atmosphere = createAtmosphere(CONFIG.earthScale * CONFIG.atmosphereScale);
+state.earth.add(atmosphere);
+state.atmosphere = atmosphere;
+
+HOTSPOTS.forEach((data) => {
+  const marker = createHotspotMarker(data);
+  const pos = latLonToVector3(data.lat, data.lon, CONFIG.earthScale * 1.02);
+  marker.position.copy(pos);
+  state.earth.add(marker);
+  state.hotspots.push(marker);
+});
+
+// Moon (satellite)
+state.moon = new THREE.Group();
+const moonGeo = new THREE.SphereGeometry(CONFIG.moonScale, 32, 32);
+const moonMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.9, metalness: 0.2, emissive: 0x38bdf8, emissiveIntensity: 0.3 });
+const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+moonMesh.castShadow = true;
+moonMesh.receiveShadow = true;
+state.moon.add(moonMesh);
+state.moon.userData = { isFallback: true, mesh: moonMesh };
+moonGroup.add(state.moon);
+moonGroup.position.set(0, 0, 0);
+
+// Sun (off-screen)
+state.sun = new THREE.Group();
+const sunGeo = new THREE.SphereGeometry(CONFIG.sunScale, 32, 32);
+const sunMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+state.sun.add(sunMesh);
+state.sun.userData = { isFallback: true, mesh: sunMesh };
+state.sun.position.set(CONFIG.sunDistance, 20, CONFIG.sunDistance * 0.8);
+scene.add(state.sun);
+
+const glowGeo = new THREE.SphereGeometry(CONFIG.sunScale * 1.3, 32, 32);
+const glowMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.08, side: THREE.BackSide });
+state.sun.add(new THREE.Mesh(glowGeo, glowMat));
+
+// ---------- Particle System for Interventions ----------
+function spawnParticleBurst(position, color, count = 40) {
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.SphereGeometry(0.04 + Math.random() * 0.06, 8, 8);
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+    const particle = new THREE.Mesh(geo, mat);
+    particle.position.copy(position);
+    particle.userData.velocity = new THREE.Vector3(
+      (Math.random() - 0.5) * 0.3,
+      (Math.random() - 0.5) * 0.3,
+      (Math.random() - 0.5) * 0.3
+    );
+    particle.userData.life = 1;
+    scene.add(particle);
+    state.particles.push(particle);
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = state.particles.length - 1; i >= 0; i--) {
+    const p = state.particles[i];
+    p.position.add(p.userData.velocity.clone().multiplyScalar(dt * 60));
+    p.userData.life -= dt * 1.2;
+    p.material.opacity = Math.max(0, p.userData.life);
+    if (p.userData.life <= 0) {
+      scene.remove(p);
+      p.geometry.dispose();
+      p.material.dispose();
+      state.particles.splice(i, 1);
+    }
+  }
+}
+
+// ---------- Asset Loading ----------
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+const loader = new GLTFLoader();
+loader.setDRACOLoader(dracoLoader);
+const loadingEl = document.getElementById('loading');
+const loadingText = loadingEl ? loadingEl.querySelector('div') : null;
+
+function updateLoadingText(msg) {
+  console.log(`[TelemetryHub] ${msg}`);
+  if (loadingText) loadingText.textContent = msg;
+}
+
+async function loadModel(path, label) {
+  try {
+    updateLoadingText(`Loading ${label}...`);
+    const absoluteUrl = new URL(path, window.location.href).href;
+    console.log(`[TelemetryHub] Fetching ${label}: ${absoluteUrl}`);
+    
+    const gltf = await loader.loadAsync(path,
+      (progress) => {
+        if (progress.total > 0) {
+          const pct = Math.round((progress.loaded / progress.total) * 100);
+          updateLoadingText(`Loading ${label}... ${pct}%`);
+        }
+      }
+    );
+    
+    console.log(`[TelemetryHub] ${label} loaded successfully`);
+    const model = gltf.scene;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    return { model, fallback: false };
+  } catch (err) {
+    console.error(`[TelemetryHub] Failed to load ${label}:`, err);
+    return { model: null, fallback: true, error: err.message };
+  }
+}
+
+async function initAssets() {
+  try {
+    updateLoadingText('Checking assets...');
+    
+    const [sunResult, earthResult, moonResult] = await Promise.all([
+      loadModel(`${CONFIG.assetBase}sun.glb`, 'Sun'),
+      loadModel(`${CONFIG.assetBase}earth.glb`, 'Earth'),
+      loadModel(`${CONFIG.assetBase}moon.glb`, 'Moon'),
+    ]);
+
+    if (!sunResult.fallback && sunResult.model) {
+      const old = state.sun.userData.mesh;
+      if (old && old.parent) state.sun.remove(old);
+      sunResult.model.scale.setScalar(CONFIG.sunScale);
+      state.sun.add(sunResult.model);
+      state.sun.userData.mesh = sunResult.model;
+      state.sun.userData.isFallback = false;
+    }
+
+    if (!earthResult.fallback && earthResult.model) {
+      const old = state.earth.userData.mesh;
+      if (old && old.parent) state.earth.remove(old);
+      earthResult.model.scale.setScalar(CONFIG.earthScale);
+      state.earth.add(earthResult.model);
+      state.earth.userData.mesh = earthResult.model;
+      state.earth.userData.isFallback = false;
+    }
+
+    if (!moonResult.fallback && moonResult.model) {
+      const old = state.moon.userData.mesh;
+      if (old && old.parent) state.moon.remove(old);
+      moonResult.model.scale.setScalar(CONFIG.moonScale);
+      state.moon.add(moonResult.model);
+      state.moon.userData.mesh = moonResult.model;
+      state.moon.userData.isFallback = false;
+    }
+
+    const anyFallback = sunResult.fallback || earthResult.fallback || moonResult.fallback;
+    if (anyFallback) {
+      const missing = [];
+      if (sunResult.fallback) missing.push(`Sun (${sunResult.error || 'unknown'})`);
+      if (earthResult.fallback) missing.push(`Earth (${earthResult.error || 'unknown'})`);
+      if (moonResult.fallback) missing.push(`Moon (${moonResult.error || 'unknown'})`);
+      
+      const isFileProtocol = window.location.protocol === 'file:';
+      const protocolMsg = isFileProtocol 
+        ? '<br><br><strong style="color:#ef4444">⚠ CORS Error:</strong> You are using file:// protocol.<br>Run: <code>npx serve .</code> or <code>python -m http.server 8080</code>'
+        : '';
+      
+      showError(`Fallback active for: ${missing.join(', ')}${protocolMsg}<br><br>Check DevTools Console (F12) for details.`);
+    }
+
+    state.loaded = true;
+    updateLoadingText('Ready');
+    setTimeout(() => {
+      if (loadingEl) loadingEl.classList.add('hidden');
+    }, 300);
+  } catch (err) {
+    console.error('[TelemetryHub] Asset init failed:', err);
+    showError(`Critical: ${err.message}`);
+    state.loaded = true;
+    if (loadingEl) loadingEl.classList.add('hidden');
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  const isFileProtocol = window.location.protocol === 'file:';
+  const protocolWarning = isFileProtocol ? '<br><br><strong style="color:#ef4444">⚠ CORS Error Detected:</strong> You are opening this file directly. GLB files cannot load via file:// protocol.<br><br><strong>Solution:</strong> Run a local server:<br><code>npx serve "' + window.location.href + '"</code><br>or<br><code>python -m http.server 8080 --directory "' + window.location.pathname + '"</code>' : '';
+  el.innerHTML = `<strong>LOAD ERROR</strong><br>${msg}${protocolWarning}`;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 15000);
+}
+
+// ---------- Controls ----------
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 6;
+controls.maxDistance = 50;
+controls.target.set(0, 0, 0);
+controls.update();
+
+// ---------- Resize ----------
+function onResize() {
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  camera.aspect = w / Math.max(h, 1);
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+
+// ---------- Interventions ----------
+window.triggerIntervention = function(type) {
+  if (state.cooldowns[type] > 0) return;
+  state.cooldowns[type] = 8;
+  state.mitigations++;
+
+  const messages = {
+    drone: 'Drone swarm deployed. Reforestation particles deployed to Earth surface.',
+    grid: 'Smart-grid load balancing activated. Carbon emissions stabilized.',
+    corridor: 'Wildlife corridor quarantine established. Migration paths secured.',
+    cloud: 'Cloud-seeding protocol initiated. Thermal dampening wave deployed.',
+  };
+
+  addLog(messages[type], 'success');
+
+  if (type === 'drone') {
+    state.flashOpacity = 1;
+    const earthPos = new THREE.Vector3();
+    state.earth.getWorldPosition(earthPos);
+    spawnParticleBurst(earthPos, 0x22c55e, 50);
+  }
+
+  if (type === 'grid') {
+    state.ecoHealth = Math.min(100, state.ecoHealth + 5);
+    state.carbonOffset += 2.5;
+    state.flashOpacity = 0.6;
+  }
+
+  if (type === 'cloud') {
+    state.threatCount = Math.max(0, state.threatCount - 1);
+    spawnParticleBurst(new THREE.Vector3(0, 2, 0), 0x67e8f9, 30);
+  }
+
+  document.getElementById('btn-' + type).disabled = true;
+};
+
+// ---------- UI ----------
+function addLog(msg, type = '') {
+  const log = document.getElementById('eventLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + type;
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-US', { hour12: false });
+  entry.innerHTML = `<span class="log-time">[${time}]</span> ${msg}`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+  if (log.children.length > 30) log.removeChild(log.firstChild);
+}
+
+function updateCooldowns(dt) {
+  for (const key of Object.keys(state.cooldowns)) {
+    if (state.cooldowns[key] > 0) {
+      state.cooldowns[key] = Math.max(0, state.cooldowns[key] - dt);
+      const btn = document.getElementById('btn-' + key);
+      const cd = document.getElementById('cd-' + key);
+      if (btn && cd) {
+        btn.disabled = true;
+        cd.style.width = ((1 - state.cooldowns[key] / 8) * 100) + '%';
+      }
+    } else {
+      const btn = document.getElementById('btn-' + key);
+      if (btn) btn.disabled = false;
+    }
+  }
+}
+
+function updateHUD() {
+  document.getElementById('ecoHealth').textContent = Math.round(state.ecoHealth) + '%';
+  document.getElementById('carbonOffset').textContent = state.carbonOffset.toFixed(1) + 't';
+  document.getElementById('threatCount').textContent = state.threatCount;
+  document.getElementById('mitigations').textContent = state.mitigations;
+
+  const ecoBar = document.getElementById('ecoBar');
+  ecoBar.style.width = state.ecoHealth + '%';
+  ecoBar.className = 'progress-fill' + (state.ecoHealth < 50 ? ' danger' : state.ecoHealth < 75 ? ' warn' : '');
+
+  const carbonPct = Math.min(100, state.carbonOffset * 2);
+  const carbonBar = document.getElementById('carbonBar');
+  carbonBar.style.width = carbonPct + '%';
+
+  const threatBar = document.getElementById('threatBar');
+  threatBar.style.width = (state.threatCount / HOTSPOTS.length * 100) + '%';
+  threatBar.className = 'progress-fill' + (state.threatCount > 2 ? ' danger' : state.threatCount > 1 ? ' warn' : '');
+}
+
+// ---------- Animation Loop ----------
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.1);
+  state.time += dt * state.speed;
+
+  if (state.loaded) {
+    state.earth.rotation.y += dt * CONFIG.earthRotationSpeed * state.speed;
+    moonGroup.rotation.y += dt * CONFIG.moonOrbitSpeed * state.speed;
+
+    state.hotspots.forEach((hs) => {
+      hs.children.forEach((child) => {
+        if (child.userData && child.userData.isPulse) {
+          const s = 1 + Math.sin(state.time * 3) * 0.3;
+          child.scale.setScalar(s);
+          child.material.opacity = 0.4 * (1 - (s - 1) / 0.3);
+        }
+      });
+    });
+
+    if (state.sun && state.sun.userData.mesh && !state.sun.userData.isFallback) {
+      const s = 1 + Math.sin(state.time * 0.5) * 0.05;
+      state.sun.userData.mesh.scale.setScalar(CONFIG.sunScale * s);
+    }
+
+    // Flash overlay
+    if (state.flashOpacity > 0.01) {
+      state.flashOpacity *= 0.94;
+    } else {
+      state.flashOpacity = 0;
+    }
+
+    updateParticles(dt);
+  }
+
+  updateCooldowns(dt);
+  updateHUD();
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ---------- Boot ----------
+async function boot() {
+  try {
+    // Pre-flight check: verify GLB files are reachable
+    for (const file of ['sun.glb', 'earth.glb', 'moon.glb']) {
+      try {
+        const res = await fetch(`${CONFIG.assetBase}${file}`, { method: 'HEAD' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        console.log(`[TelemetryHub] Pre-flight OK: ${file} (${res.headers.get('content-type')})`);
+      } catch (err) {
+        console.warn(`[TelemetryHub] Pre-flight failed for ${file}:`, err);
+        if (window.location.protocol === 'file:') {
+          showError(`Cannot load ${file} via file:// protocol.<br><br><strong>Run a local server first:</strong><br><code>npx serve .</code><br>or<br><code>python -m http.server 8080</code>`);
+        }
+      }
+    }
+    
+    await initAssets();
+    animate();
+  } catch (err) {
+    console.error('[TelemetryHub] Boot failed:', err);
+    showError(`Initialization error: ${err.message}`);
+    state.loaded = true;
+    if (loadingEl) loadingEl.classList.add('hidden');
+    animate();
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
